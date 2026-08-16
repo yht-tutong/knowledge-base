@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>知识库</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+    <div class="mobile-header">
+        <button type="button" class="hamburger" id="hamburgerBtn">☰</button>
+        <h2>知识库</h2>
+    </div>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div class="toast-container" id="toastContainer"></div>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <span>处理中...</span>
+    </div>
+    <div class="app-container">
+        <!-- 左侧导航栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>知识库</h2>
+            </div>
+            <nav class="category-nav">
+                <a href="#" class="category-item active" data-category-id="">
+                    <span class="category-name">全部分类</span>
+                </a>
+                <div class="category-list" id="categoryList"></div>
+            </nav>
+            <div class="sidebar-section">
+                <div class="sidebar-section-header">
+                    <span>分类管理</span>
+                </div>
+                <div class="category-add-row">
+                    <input type="text" id="newCategoryName" placeholder="新增分类..." maxlength="20">
+                    <button type="button" class="btn btn-category-add" id="btnAddCategory">+</button>
+                </div>
+            </div>
+            <div class="sidebar-section">
+                <div class="sidebar-section-header">
+                    <span>标签筛选</span>
+                    <button type="button" class="btn-tag-manage" id="btnTagManage" title="管理标签">+</button>
+                </div>
+                <div class="tag-filter-area" id="tagFilterArea">
+                    <div class="tag-filter-empty">暂无标签</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 右侧主内容区 -->
+        <main class="main-content">
+            <!-- 工具栏 -->
+            <div class="toolbar">
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="搜索知识点..." autocomplete="off">
+                    <button id="searchBtn" class="btn btn-search">搜索</button>
+                </div>
+                <div class="toolbar-actions">
+                    <button type="button" class="btn btn-toolbar" id="btnHistory">操作历史</button>
+                    <button type="button" class="btn btn-toolbar" id="btnBackup">备份管理</button>
+                    <button type="button" class="btn btn-toolbar" id="btnLogs">查看日志</button>
+                    <button type="button" class="btn btn-toolbar" id="btnSettings">设置</button>
+                    <button id="importBtn" class="btn btn-import">导入</button>
+                    <button id="exportBtn" class="btn btn-export" disabled>导出选中</button>
+                    <button id="addBtn" class="btn btn-primary">+ 新增</button>
+                </div>
+            </div>
+
+            <!-- 批量操作栏 -->
+            <div class="batch-toolbar" id="batchToolbar">
+                <button type="button" class="btn btn-batch" id="btnSelectAll">全选</button>
+                <button type="button" class="btn btn-batch" id="btnInvertSelect">反选</button>
+                <button type="button" class="btn btn-batch" id="btnClearSelect">取消选择</button>
+                <span class="batch-count" id="batchCount">已选 0 个</span>
+                <button type="button" class="btn btn-batch-delete" id="btnBatchDelete">批量删除</button>
+                <button type="button" class="btn btn-batch-export-json" id="btnExportJson">导出 JSON</button>
+                <button type="button" class="btn btn-batch-export-txt" id="btnExportTxt">导出 TXT</button>
+            </div>
+
+            <!-- 知识点列表 -->
+            <div class="knowledge-list" id="knowledgeList">
+                <div class="empty-state">加载中...</div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 新增/编辑知识点模态框 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modalTitle">新增知识点</h3>
+                <button class="modal-close" id="modalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="knowledgeForm">
+                    <input type="hidden" id="editKnowledgeId" value="">
+                    <div class="form-group">
+                        <label for="knowledgeTitle">标题</label>
+                        <input type="text" id="knowledgeTitle" placeholder="请输入标题" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="knowledgeCategory">分类</label>
+                        <select id="knowledgeCategory" required>
+                            <option value="">请选择分类</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="knowledgeContent">内容</label>
+                        <textarea id="knowledgeContent" rows="6" placeholder="请输入内容" required></textarea>
+                        <input type="file" id="imageInput" accept="image/*" style="display:none">
+                        <div class="md-preview" id="mdPreview" style="display:none;"></div>
+                        <div class="content-toolbar">
+                            <button type="button" class="btn btn-sm" id="btnUploadImage">插入图片</button>
+                            <button type="button" class="btn btn-sm" id="btnUploadFile">插入附件</button>
+                            <input type="file" id="fileInput" style="display:none">
+                            <button type="button" class="btn btn-sm" id="btnPreviewMD">预览</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>标签</label>
+                        <div class="tag-checkbox-grid" id="tagCheckboxGrid">
+                            <div class="tag-checkbox-empty">暂无标签，请先在标签管理中创建</div>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn btn-cancel" id="cancelBtn">取消</button>
+                        <button type="submit" class="btn btn-primary">提交</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 标签管理模态框 -->
+    <div class="modal-overlay" id="tagModalOverlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>标签管理</h3>
+                <button class="modal-close" id="tagModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="newTagName">标签名称</label>
+                    <div class="tag-add-row">
+                        <input type="text" id="newTagName" placeholder="请输入标签名称" maxlength="20">
+                        <select id="newTagShape">
+                            <option value="ellipse">椭圆形</option>
+                            <option value="rectangle">矩形</option>
+                        </select>
+                        <input type="color" id="newTagColor" value="#4a90d9">
+                        <button type="button" class="btn btn-primary" id="btnAddTag">添加</button>
+                    </div>
+                </div>
+                <div class="tag-manage-list" id="tagManageList">
+                    <div class="tag-manage-empty">暂无标签</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入模态框 -->
+    <div class="modal-overlay" id="importModalOverlay">
+        <div class="modal modal-import">
+            <div class="modal-header">
+                <h3>导入知识点</h3>
+                <button class="modal-close" id="importModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>或直接粘贴 JSON</label>
+                    <textarea id="importPasteArea" rows="6" placeholder="在此粘贴 JSON 数组..."></textarea>
+                    <button type="button" class="btn btn-primary" id="btnParsePaste" style="margin-top:8px;">解析粘贴内容</button>
+                </div>
+                <div class="form-group">
+                    <label>选择 JSON 文件</label>
+                    <div class="file-upload-area" id="fileUploadArea">
+                        <div class="file-upload-icon">📁</div>
+                        <div>点击或拖拽 JSON 文件到此处</div>
+                        <input type="file" id="importFileInput" accept=".json" style="display:none;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>JSON 预览</label>
+                    <textarea id="importPreview" rows="8" placeholder="选择文件后在此预览..." readonly></textarea>
+                </div>
+                <div class="form-group">
+                    <label>AI 提示词模板</label>
+                    <div class="prompt-template-container">
+                        <pre class="prompt-template" id="promptTemplate"></pre>
+                        <button class="btn btn-copy-prompt" id="btnCopyPrompt">复制</button>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="importCancelBtn">取消</button>
+                    <button type="button" class="btn btn-primary" id="btnConfirmImport" disabled>确认导入</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 拖拽选择框 -->
+    <div class="selection-box" id="selectionBox"></div>
+
+    <!-- 自定义确认弹窗 -->
+    <div class="modal-overlay" id="confirmModalOverlay">
+        <div class="modal" style="width:360px;">
+            <div class="modal-header">
+                <h3>确认操作</h3>
+            </div>
+            <div class="modal-body">
+                <p id="confirmMessage"></p>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="confirmCancelBtn">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirmOkBtn">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 操作历史模态框 -->
+    <div class="modal-overlay" id="historyModalOverlay">
+        <div class="modal" style="width:700px;max-height:80vh;">
+            <div class="modal-header">
+                <h3>操作历史</h3>
+                <button type="button" class="modal-close" id="historyModalClose">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height:60vh;overflow-y:auto;">
+                <div id="historyList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 备份管理模态框 -->
+    <div class="modal-overlay" id="backupModalOverlay">
+        <div class="modal" style="width:500px;max-height:80vh;">
+            <div class="modal-header">
+                <h3>备份管理</h3>
+                <button type="button" class="modal-close" id="backupModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="backupNote">备份备注</label>
+                    <input type="text" id="backupNote" placeholder="可选，输入备份备注..." maxlength="50" style="margin-bottom:8px;">
+                </div>
+                <button type="button" class="btn btn-primary" id="btnCreateBackup" style="margin-bottom:12px;">创建新备份</button>
+                <div id="backupList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 日志查看模态框 -->
+    <div class="modal-overlay" id="logModalOverlay">
+        <div class="modal" style="width:800px;max-height:85vh;">
+            <div class="modal-header">
+                <h3>系统日志</h3>
+                <button type="button" class="modal-close" id="logModalClose">&times;</button>
+            </div>
+            <div class="modal-body log-viewer-body">
+                <div class="log-file-selector" id="logFileList"></div>
+                <pre class="log-content" id="logContent"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导出 TXT 选项模态框 -->
+    <div class="modal-overlay" id="exportModalOverlay">
+        <div class="modal" style="width:400px;">
+            <div class="modal-header">
+                <h3>导出 TXT 选项</h3>
+                <button type="button" class="modal-close" id="exportModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:12px;">选择要导出的字段：</p>
+                <label style="display:block;margin:4px 0;"><input type="checkbox" id="exportFieldTitle" checked> 标题</label>
+                <label style="display:block;margin:4px 0;"><input type="checkbox" id="exportFieldContent" checked> 内容</label>
+                <label style="display:block;margin:4px 0;"><input type="checkbox" id="exportFieldCategory" checked> 分类</label>
+                <label style="display:block;margin:4px 0;"><input type="checkbox" id="exportFieldTags" checked> 标签</label>
+                <div class="form-actions" style="margin-top:16px;">
+                    <button type="button" class="btn btn-cancel" id="exportCancelBtn">取消</button>
+                    <button type="button" class="btn btn-primary" id="exportConfirmBtn">导出</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 详情模态框 -->
+    <div class="modal-overlay" id="detailModalOverlay">
+        <div class="modal modal-detail">
+            <div class="modal-header">
+                <h3 id="detailTitle"></h3>
+                <button type="button" class="modal-close" id="detailModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-meta">
+                    <span id="detailCategory"></span>
+                    <span id="detailTime"></span>
+                </div>
+                <div class="detail-tags" id="detailTags"></div>
+                <div class="detail-content markdown-body" id="detailContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 设置模态框 -->
+    <div class="modal-overlay" id="settingsModalOverlay">
+        <div class="modal" style="width:400px;">
+            <div class="modal-header">
+                <h3>系统设置</h3>
+                <button type="button" class="modal-close" id="settingsModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="settingsPassword">登录密码</label>
+                    <input type="password" id="settingsPassword" placeholder="留空不修改" maxlength="32">
+                </div>
+                <div class="form-group">
+                    <label for="settingsBackup">启动时自动备份</label>
+                    <select id="settingsBackup">
+                        <option value="true">开启</option>
+                        <option value="false">关闭</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="settingsDebug">调试模式</label>
+                    <select id="settingsDebug">
+                        <option value="false">关闭</option>
+                        <option value="true">开启</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="settingsDisableLogin">关闭登录验证</label>
+                    <select id="settingsDisableLogin">
+                        <option value="false">需要登录</option>
+                        <option value="true">跳过登录</option>
+                    </select>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="settingsCancelBtn">取消</button>
+                    <button type="button" class="btn btn-primary" id="settingsSaveBtn">保存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>
