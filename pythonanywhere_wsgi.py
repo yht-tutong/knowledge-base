@@ -7,7 +7,7 @@ import os
 
 # 项目目录（上传到 PythonAnywhere 后的路径）
 # 如果目录名不同，修改下面这行
-project_home = '/home/tutong/knowledge_base'
+project_home = '/home/Tutong/knowledge_base'
 if project_home not in sys.path:
     sys.path.insert(0, project_home)
 
