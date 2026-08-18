@@ -10,13 +10,14 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(BASE_DIR, 'config.json')
 
 DEFAULT_CONFIG = {
-    'password_hash': '',           # SHA256 密码哈希
-    'enable_startup_backup': True, # 启动时自动备份
-    'debug': False,                # 调试模式
-    'disable_login': False,        # 关闭登录验证
-    'ssl_cert': '',                # SSL 证书路径
-    'ssl_key': '',                 # SSL 私钥路径
-    'first_run': True,             # 是否首次运行
+    'password_hash': '',              # SHA256 密码哈希
+    'enable_startup_backup': True,    # 启动时自动备份
+    'debug': False,                   # 调试模式
+    'disable_login': True,            # 关闭登录验证（默认关闭）
+    'enable_temp_password': False,    # 启用临时密码（默认关闭）
+    'ssl_cert': '',                   # SSL 证书路径
+    'ssl_key': '',                    # SSL 私钥路径
+    'first_run': True,                # 是否首次运行
     'host': '0.0.0.0',
     'port': 5000,
 }

@@ -92,7 +92,7 @@ class Database:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 description TEXT DEFAULT '',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )
         ''')
         # 预置高中学科分类
@@ -119,8 +119,8 @@ class Database:
                 title TEXT NOT NULL,
                 content TEXT DEFAULT '',
                 category_id INTEGER NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
+                updated_at TIMESTAMP DEFAULT (datetime('now', 'localtime')),
                 FOREIGN KEY (category_id) REFERENCES categories(id)
             )
         ''')
@@ -129,7 +129,7 @@ class Database:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
                 shape TEXT NOT NULL DEFAULT 'ellipse',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )
         ''')
         cursor.execute('''
@@ -152,7 +152,7 @@ class Database:
                 before_state TEXT DEFAULT '{}',
                 after_state TEXT DEFAULT '{}',
                 affected_ids TEXT DEFAULT '[]',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )
         ''')
         cursor.execute('''
@@ -160,7 +160,7 @@ class Database:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
                 password_hash TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT (datetime('now', 'localtime'))
             )
         ''')
         # 迁移：为 tags 表添加 color 列

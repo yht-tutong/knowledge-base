@@ -650,6 +650,28 @@ input, select, textarea, button {
     color: #ffffff;
 }
 
+.btn-secondary {
+    background: #ffffff;
+    color: #666;
+    border-color: #ccc;
+}
+
+.btn-secondary:hover {
+    background: #f5f5f5;
+    border-color: #999;
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: #ffffff;
+    border-color: #e67e22;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #e67e22, #d35400);
+    color: #ffffff;
+}
+
 .btn-edit {
     background: #ffffff;
     color: #4a90d9;

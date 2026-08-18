@@ -35,7 +35,7 @@ class KnowledgeService:
 
     def create(self, title, content, category_id, tag_ids=None):
         cursor = self.db.execute_write(
-            'INSERT INTO knowledge_points (title, content, category_id) VALUES (?, ?, ?)',
+            "INSERT INTO knowledge_points (title, content, category_id, created_at, updated_at) VALUES (?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))",
             (title, content, category_id)
         )
         kp_id = cursor.lastrowid
@@ -132,7 +132,7 @@ class KnowledgeService:
             fields.append('category_id = ?')
             params.append(category_id)
         if fields:
-            fields.append('updated_at = CURRENT_TIMESTAMP')
+            fields.append("updated_at = datetime('now', 'localtime')")
             params.append(kp_id)
             self.db.execute_write(
                 'UPDATE knowledge_points SET {} WHERE id = ?'.format(', '.join(fields)),
@@ -161,7 +161,7 @@ class KnowledgeService:
             return None
         new_title = row['title'] + '（副本）'
         cursor = self.db.execute_write(
-            'INSERT INTO knowledge_points (title, content, category_id) VALUES (?, ?, ?)',
+            "INSERT INTO knowledge_points (title, content, category_id, created_at, updated_at) VALUES (?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))",
             (new_title, row['content'], row['category_id'])
         )
         new_id = cursor.lastrowid
@@ -238,7 +238,7 @@ class KnowledgeService:
                         continue
 
                     cursor.execute(
-                        'INSERT INTO knowledge_points (title, content, category_id) VALUES (?, ?, ?)',
+                        "INSERT INTO knowledge_points (title, content, category_id, created_at, updated_at) VALUES (?, ?, ?, datetime('now', 'localtime'), datetime('now', 'localtime'))",
                         (title, content, category_id)
                     )
                     kp_id = cursor.lastrowid

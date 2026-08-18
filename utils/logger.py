@@ -9,6 +9,7 @@ from logging.handlers import RotatingFileHandler
 LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs')
 
 _global_debug = False
+_current_log_file = None
 
 
 def print_banner():
@@ -43,7 +44,7 @@ class ColoredFormatter(logging.Formatter):
     COLORS = {
         'ERROR': '\033[91m',
         'WARNING': '\033[93m',
-        'INFO': '\033[92m',
+        'INFO': '\033[97m',
         'DEBUG': '\033[90m',
     }
     RESET = '\033[0m'
@@ -68,10 +69,12 @@ def print_step(status, message):
 
 def get_logger(name=None, debug=False):
     """获取日志实例，每次启动生成带时间戳的日志文件"""
+    global _current_log_file
     os.makedirs(LOG_DIR, exist_ok=True)
 
     timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
     log_file = os.path.join(LOG_DIR, f'startup_{timestamp}.log')
+    _current_log_file = log_file
 
     logger = logging.getLogger(name or 'knowledge_base')
     logger.setLevel(logging.DEBUG)
@@ -105,3 +108,8 @@ def setup_global_debug(debug):
     _global_debug = debug
     if debug:
         logging.getLogger().setLevel(logging.DEBUG)
+
+
+def get_current_log_file():
+    """获取当前启动的日志文件路径"""
+    return _current_log_file

@@ -76,3 +76,19 @@ def logout():
 @auth_bp.route('/auth/status', methods=['GET'])
 def status():
     return jsonify({'code': 200, 'data': {'logged_in': check_auth()}})
+
+@auth_bp.route('/auth/restart-login', methods=['POST'])
+def restart_login():
+    """重启后自动登录：验证一次性令牌"""
+    from utils.config import load_config, save_config
+    body = request.get_json() or {}
+    token = body.get('token', '')
+    config = load_config()
+    saved_token = config.get('restart_token', '')
+    if token and saved_token and token == saved_token:
+        session['logged_in'] = True
+        session.permanent = True
+        config['restart_token'] = ''
+        save_config(config)
+        return jsonify({'code': 200, 'data': {'message': '自动登录成功'}})
+    return jsonify({'code': 401, 'message': '令牌无效'}), 401

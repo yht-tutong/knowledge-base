@@ -12,8 +12,41 @@ var App = (function() {
     var importData = null;
     var currentKnowledgeItems = [];
 
+    // 渲染 Markdown 并在 DOM 中渲染 LaTeX 公式
+    function renderMarkdownTo(el, content) {
+        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+            el.innerHTML = marked.parse(content);
+            if (typeof renderMathInElement === 'function') {
+                try {
+                    renderMathInElement(el, {
+                        delimiters: [
+                            {left: '$$', right: '$$', display: true},
+                            {left: '$', right: '$', display: false}
+                        ],
+                        throwOnError: false
+                    });
+                } catch(e) {
+                    // KaTeX 渲染失败，保留 marked 渲染的纯文本
+                }
+            }
+        } else {
+            el.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;">' + escapeHtml(content) + '</pre>';
+        }
+    }
+
     // ==================== 初始化 ====================
     function init() {
+        // 重启后自动登录：消耗 restart_token（如果会话仍有效）
+        var restartToken = localStorage.getItem('restart_token');
+        if (restartToken) {
+            localStorage.removeItem('restart_token');
+            fetch('/auth/restart-login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({token: restartToken})
+            }).catch(function() {});
+        }
+
         // 搜索
         document.getElementById('searchInput').addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
@@ -112,10 +145,10 @@ var App = (function() {
             var preview = document.getElementById('mdPreview');
             var textarea = document.getElementById('knowledgeContent');
             if (preview.style.display === 'none') {
-                preview.innerHTML = marked.parse(textarea.value || '');
                 preview.style.display = 'block';
                 textarea.style.display = 'none';
                 this.textContent = '编辑';
+                renderMarkdownTo(preview, textarea.value || '');
             } else {
                 preview.style.display = 'none';
                 textarea.style.display = 'block';
@@ -229,6 +262,31 @@ var App = (function() {
             if (e.target === this) closeSettingsModal();
         });
         document.getElementById('settingsSaveBtn').addEventListener('click', saveSettings);
+        document.getElementById('settingsDisableLogin').addEventListener('change', updateLoginSubOptions);
+        document.querySelectorAll('input[name="passwordMode"]').forEach(function(el) {
+            el.addEventListener('change', updatePasswordMode);
+        });
+        document.getElementById('btnClearCache').addEventListener('click', showCacheModal);
+        document.getElementById('btnReset').addEventListener('click', showResetModal);
+        document.getElementById('resetModalClose').addEventListener('click', closeResetModal);
+        document.getElementById('resetCancelBtn').addEventListener('click', closeResetModal);
+        document.getElementById('resetModalOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closeResetModal();
+        });
+        document.getElementById('resetConfirmBtn').addEventListener('click', resetSystem);
+        document.getElementById('cacheModalClose').addEventListener('click', closeCacheModal);
+        document.getElementById('cacheCancelBtn').addEventListener('click', closeCacheModal);
+        document.getElementById('cacheModalOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closeCacheModal();
+        });
+        document.getElementById('cacheConfirmBtn').addEventListener('click', clearCache);
+        document.getElementById('btnRestart').addEventListener('click', showRestartModal);
+        document.getElementById('restartModalClose').addEventListener('click', closeRestartModal);
+        document.getElementById('restartCancelBtn').addEventListener('click', closeRestartModal);
+        document.getElementById('restartModalOverlay').addEventListener('click', function(e) {
+            if (e.target === this) closeRestartModal();
+        });
+        document.getElementById('restartConfirmBtn').addEventListener('click', restartSystem);
 
         // 详情弹窗
         document.getElementById('detailModalClose').addEventListener('click', closeDetailModal);
@@ -330,18 +388,12 @@ var App = (function() {
 
     function formatTime(dateStr) {
         if (!dateStr) return '--';
-        try {
-            var d = new Date(dateStr);
-            if (isNaN(d.getTime())) return dateStr;
-            var year = d.getFullYear();
-            var month = ('0' + (d.getMonth() + 1)).slice(-2);
-            var day = ('0' + d.getDate()).slice(-2);
-            var hours = ('0' + d.getHours()).slice(-2);
-            var minutes = ('0' + d.getMinutes()).slice(-2);
-            return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes;
-        } catch (e) {
-            return dateStr;
+        // 直接解析 "YYYY-MM-DD HH:MM:SS" 格式，不做时区转换
+        var match = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/.exec(dateStr);
+        if (match) {
+            return match[1] + '-' + match[2] + '-' + match[3] + ' ' + match[4] + ':' + match[5];
         }
+        return dateStr;
     }
 
     function escapeHtml(str) {
@@ -1447,11 +1499,7 @@ var App = (function() {
         // 渲染 Markdown 内容
         var content = kp.content || '';
         var contentEl = document.getElementById('detailContent');
-        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
-            contentEl.innerHTML = marked.parse(content);
-        } else {
-            contentEl.innerHTML = '<pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;">' + escapeHtml(content) + '</pre>';
-        }
+        renderMarkdownTo(contentEl, content);
 
         document.getElementById('detailModalOverlay').classList.add('show');
     }
@@ -1732,22 +1780,57 @@ function escapeHtml(str) {
 }
 
 // ==================== 设置 ====================
+var _settingsConfig = null;
+
 function showSettingsModal() {
     API.getConfig().then(function(config) {
+        _settingsConfig = config;
+        // 登录验证
+        var disableLogin = document.getElementById('settingsDisableLogin');
+        disableLogin.value = config.disable_login ? 'true' : 'false';
+        // 密码方式单选
+        var radioFixed = document.querySelector('input[name="passwordMode"][value="fixed"]');
+        var radioTemp = document.querySelector('input[name="passwordMode"][value="temp"]');
+        if (config.enable_temp_password) {
+            radioTemp.checked = true;
+        } else {
+            radioFixed.checked = true;
+        }
+        // 密码输入框
         var pwdField = document.getElementById('settingsPassword');
         pwdField.value = '';
+        var statusEl = document.getElementById('passwordStatus');
         if (config.has_password) {
-            pwdField.placeholder = '已设置密码（输入新密码以修改）';
+            pwdField.placeholder = '输入新密码以修改';
+            statusEl.textContent = '已设置密码';
+            statusEl.style.color = '#27ae60';
         } else {
-            pwdField.placeholder = '未设置密码（输入以设置）';
+            pwdField.placeholder = '请输入密码';
+            statusEl.textContent = '未设置密码';
+            statusEl.style.color = '#999';
         }
+        // 其他设置
         document.getElementById('settingsBackup').value = config.enable_startup_backup ? 'true' : 'false';
         document.getElementById('settingsDebug').value = config.debug ? 'true' : 'false';
-        document.getElementById('settingsDisableLogin').value = config.disable_login ? 'true' : 'false';
+        // 联动
+        updateLoginSubOptions();
+        updatePasswordMode();
         document.getElementById('settingsModalOverlay').classList.add('show');
     }).catch(function(err) {
         showToastGlobal('加载配置失败: ' + (err.message || '请重试'), 'error');
     });
+}
+
+function updateLoginSubOptions() {
+    var disableLogin = document.getElementById('settingsDisableLogin').value === 'true';
+    document.getElementById('loginSubOptions').style.display = disableLogin ? 'none' : '';
+}
+
+function updatePasswordMode() {
+    var radioTemp = document.querySelector('input[name="passwordMode"][value="temp"]');
+    var isTemp = radioTemp.checked;
+    document.getElementById('fixedPasswordGroup').style.display = isTemp ? 'none' : '';
+    document.getElementById('tempPasswordHint').style.display = isTemp ? '' : 'none';
 }
 
 function closeSettingsModal() {
@@ -1755,12 +1838,22 @@ function closeSettingsModal() {
 }
 
 function saveSettings() {
+    var disableLogin = document.getElementById('settingsDisableLogin').value === 'true';
+    var radioTemp = document.querySelector('input[name="passwordMode"][value="temp"]');
+    var enableTempPassword = !disableLogin && radioTemp.checked;
+
     var data = {
-        password: document.getElementById('settingsPassword').value,
         enable_startup_backup: document.getElementById('settingsBackup').value === 'true',
         debug: document.getElementById('settingsDebug').value === 'true',
-        disable_login: document.getElementById('settingsDisableLogin').value === 'true'
+        disable_login: disableLogin,
+        enable_temp_password: enableTempPassword
     };
+
+    // 固定密码模式且输入了密码
+    if (!disableLogin && !enableTempPassword && document.getElementById('settingsPassword').value) {
+        data.password = document.getElementById('settingsPassword').value;
+    }
+
     API.saveConfig(data).then(function() {
         showToastGlobal('设置已保存', 'success');
         closeSettingsModal();
@@ -1772,6 +1865,183 @@ function saveSettings() {
         }
     }).catch(function(err) {
         showToastGlobal('保存失败: ' + (err.message || '请重试'), 'error');
+    });
+}
+
+var resetTimer = null;
+var cacheTimer = null;
+var restartTimer = null;
+
+function showLoadingOverlay() {
+    var el = document.getElementById('loadingOverlay');
+    if (el) el.classList.add('show');
+}
+
+function hideLoadingOverlay() {
+    var el = document.getElementById('loadingOverlay');
+    if (el) el.classList.remove('show');
+}
+
+function startCountdown(btnId, spanId, timerVar) {
+    var countdown = 3;
+    var btn = document.getElementById(btnId);
+    var span = document.getElementById(spanId);
+    btn.disabled = true;
+    span.textContent = countdown;
+
+    var timer = setInterval(function() {
+        countdown--;
+        if (countdown <= 0) {
+            clearInterval(timer);
+            if (timerVar === 'reset') resetTimer = null;
+            else if (timerVar === 'cache') cacheTimer = null;
+            else restartTimer = null;
+            btn.disabled = false;
+            btn.textContent = btnId === 'resetConfirmBtn' ? '确认重置' : (btnId === 'restartConfirmBtn' ? '确认重启' : '确认清除');
+        } else {
+            span.textContent = countdown;
+        }
+    }, 1000);
+
+    if (timerVar === 'reset') resetTimer = timer;
+    else if (timerVar === 'cache') cacheTimer = timer;
+    else restartTimer = timer;
+}
+
+function stopTimer(timerVar) {
+    var timer = timerVar === 'reset' ? resetTimer : (timerVar === 'cache' ? cacheTimer : restartTimer);
+    if (timer) {
+        clearInterval(timer);
+        if (timerVar === 'reset') resetTimer = null;
+        else if (timerVar === 'cache') cacheTimer = null;
+        else restartTimer = null;
+    }
+}
+
+// ====== 清除缓存 ======
+function showCacheModal() {
+    closeSettingsModal();
+    document.getElementById('cacheModalOverlay').classList.add('show');
+    startCountdown('cacheConfirmBtn', 'cacheCountdown', 'cache');
+}
+
+function closeCacheModal() {
+    stopTimer('cache');
+    document.getElementById('cacheModalOverlay').classList.remove('show');
+}
+
+function clearCache() {
+    var btn = document.getElementById('cacheConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = '清除中...';
+    showLoadingOverlay();
+    API.clearCache().then(function(res) {
+        // 保存重启令牌，用于重启后自动登录
+        if (res.restart_token) {
+            localStorage.setItem('restart_token', res.restart_token);
+        }
+        showToastGlobal(res.message || '缓存已清除', 'success');
+        closeCacheModal();
+        // 轮询等待系统重启完成，然后刷新页面
+        var attempts = 0;
+        var poll = setInterval(function() {
+            attempts++;
+            fetch('/api/config').then(function(r) {
+                if (r.ok) {
+                    clearInterval(poll);
+                    window.location.reload();
+                }
+            }).catch(function() {
+                if (attempts >= 30) {
+                    clearInterval(poll);
+                    hideLoadingOverlay();
+                    showToastGlobal('系统重启超时，请手动刷新页面', 'error');
+                }
+            });
+        }, 1000);
+    }).catch(function(err) {
+        hideLoadingOverlay();
+        showToastGlobal('清除缓存失败: ' + (err.message || '请重试'), 'error');
+        btn.disabled = false;
+        btn.textContent = '确认清除';
+    });
+}
+
+// ====== 重启系统 ======
+function showResetModal() {
+    closeSettingsModal();
+    document.getElementById('resetModalOverlay').classList.add('show');
+    startCountdown('resetConfirmBtn', 'resetCountdown', 'reset');
+}
+
+function closeResetModal() {
+    stopTimer('reset');
+    document.getElementById('resetModalOverlay').classList.remove('show');
+}
+
+function resetSystem() {
+    var btn = document.getElementById('resetConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = '重置中...';
+    showLoadingOverlay();
+    API.resetSystem().then(function(res) {
+        hideLoadingOverlay();
+        showToastGlobal(res.message || '系统已重置', 'success');
+        closeResetModal();
+    }).catch(function(err) {
+        hideLoadingOverlay();
+        showToastGlobal('重置失败: ' + (err.message || '请重试'), 'error');
+        btn.disabled = false;
+        btn.textContent = '确认重置';
+    });
+}
+
+// ====== 重启系统 ======
+function showRestartModal() {
+    closeSettingsModal();
+    document.getElementById('restartModalOverlay').classList.add('show');
+    startCountdown('restartConfirmBtn', 'restartCountdown', 'restart');
+}
+
+function closeRestartModal() {
+    stopTimer('restart');
+    document.getElementById('restartModalOverlay').classList.remove('show');
+}
+
+function restartSystem() {
+    var btn = document.getElementById('restartConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = '重启中...';
+    showLoadingOverlay();
+    API.restartSystem().then(function(res) {
+        // 保存重启令牌，用于重启后自动登录
+        if (res.restart_token) {
+            localStorage.setItem('restart_token', res.restart_token);
+        }
+        showToastGlobal(res.message || '系统正在重启', 'success');
+        closeRestartModal();
+        // 轮询等待系统重启完成，然后刷新页面（由新服务器处理自动登录）
+        var attempts = 0;
+        var poll = setInterval(function() {
+            attempts++;
+            fetch('/api/config').then(function(r) {
+                if (r.ok) {
+                    clearInterval(poll);
+                    window.location.reload();
+                }
+            }).catch(function() {
+                if (attempts >= 30) {
+                    clearInterval(poll);
+                    hideLoadingOverlay();
+                    showToastGlobal('系统重启超时，请手动刷新页面', 'error');
+                }
+            });
+        }, 1000);
+    }).catch(function(err) {
+        hideLoadingOverlay();
+        showToastGlobal('重启失败: ' + (err.message || '请重试'), 'error');
+        btn.disabled = false;
+        btn.textContent = '确认重启';
     });
 }
 

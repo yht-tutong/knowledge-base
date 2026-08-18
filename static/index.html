@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>知识库</title>
     <link rel="stylesheet" href="/css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="stylesheet" href="/vendor/katex/katex.min.css">
+    <script src="/vendor/marked.min.js"></script>
+    <script src="/vendor/katex/katex.min.js"></script>
+    <script src="/vendor/katex/auto-render.min.js"></script>
+    
 </head>
 <body>
     <div class="mobile-header">
@@ -313,10 +317,6 @@
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label for="settingsPassword">登录密码</label>
-                    <input type="password" id="settingsPassword" placeholder="留空不修改" maxlength="32">
-                </div>
-                <div class="form-group">
                     <label for="settingsBackup">启动时自动备份</label>
                     <select id="settingsBackup">
                         <option value="true">开启</option>
@@ -330,16 +330,109 @@
                         <option value="true">开启</option>
                     </select>
                 </div>
+                <hr style="margin:16px 0;border-color:#eee;">
+                <h4 style="margin-bottom:12px;color:#333;">登录设置</h4>
                 <div class="form-group">
-                    <label for="settingsDisableLogin">关闭登录验证</label>
+                    <label for="settingsDisableLogin">登录验证</label>
                     <select id="settingsDisableLogin">
                         <option value="false">需要登录</option>
-                        <option value="true">跳过登录</option>
+                        <option value="true">不需要登录</option>
                     </select>
                 </div>
+                <div id="loginSubOptions" style="display:none;">
+                    <div class="form-group">
+                        <label>密码方式</label>
+                        <div class="radio-group" style="display:flex;gap:20px;padding:8px 0;">
+                            <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:normal;">
+                                <input type="radio" name="passwordMode" value="fixed" style="width:auto;"> 固定密码
+                            </label>
+                            <label style="cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:normal;">
+                                <input type="radio" name="passwordMode" value="temp" style="width:auto;"> 临时密码
+                            </label>
+                        </div>
+                    </div>
+                    <div class="form-group" id="fixedPasswordGroup" style="display:none;">
+                        <label for="settingsPassword">登录密码</label>
+                        <input type="password" id="settingsPassword" placeholder="请输入密码" maxlength="32">
+                        <small id="passwordStatus" style="color:#999;"></small>
+                    </div>
+                    <div class="form-group" id="tempPasswordHint" style="display:none;">
+                        <small style="color:#999;">开启后每次启动生成随机密码，仅在终端显示。<br>重启系统不改变临时密码，关闭后再次启动时密码更新。</small>
+                    </div>
+                </div>
+                <hr style="margin:16px 0;border-color:#eee;">
                 <div class="form-actions">
                     <button type="button" class="btn btn-cancel" id="settingsCancelBtn">取消</button>
                     <button type="button" class="btn btn-primary" id="settingsSaveBtn">保存</button>
+                </div>
+                <hr style="margin:16px 0;border-color:#eee;">
+                <div class="form-actions" style="justify-content:space-between;">
+                    <button type="button" class="btn btn-secondary" id="btnClearCache">清除缓存</button>
+                    <button type="button" class="btn btn-warning" id="btnRestart">重启系统</button>
+                    <button type="button" class="btn btn-danger" id="btnReset">重置系统</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重启系统确认模态框 -->
+    <div class="modal-overlay" id="resetModalOverlay">
+        <div class="modal" style="width:400px;">
+            <div class="modal-header">
+                <h3>确认重置系统</h3>
+                <button type="button" class="modal-close" id="resetModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:#e74c3c;font-weight:bold;margin-bottom:12px;">此操作将删除所有数据，包括：</p>
+                <ul style="margin:8px 0 16px 20px;color:#666;">
+                    <li>知识点、分类、标签</li>
+                    <li>操作日志、备份文件</li>
+                    <li>上传的文件和图片</li>
+                </ul>
+                <p style="color:#999;font-size:12px;">自动重启后请手动刷新页面</p>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="resetCancelBtn">取消</button>
+                    <button type="button" class="btn btn-danger" id="resetConfirmBtn" disabled>确认重置（<span id="resetCountdown">3</span>s）</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 清除缓存确认模态框 -->
+    <div class="modal-overlay" id="cacheModalOverlay">
+        <div class="modal" style="width:400px;">
+            <div class="modal-header">
+                <h3>确认清除缓存</h3>
+                <button type="button" class="modal-close" id="cacheModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:12px;">将清除以下内容：</p>
+                <ul style="margin:8px 0 16px 20px;color:#666;">
+                    <li>所有日志文件</li>
+                    <li>Python 缓存文件（__pycache__）</li>
+                </ul>
+                <p style="color:#999;font-size:12px;">自动重启后请手动刷新页面</p>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="cacheCancelBtn">取消</button>
+                    <button type="button" class="btn btn-primary" id="cacheConfirmBtn" disabled>确认清除（<span id="cacheCountdown">3</span>s）</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 重启系统确认模态框 -->
+    <div class="modal-overlay" id="restartModalOverlay">
+        <div class="modal" style="width:400px;">
+            <div class="modal-header">
+                <h3>确认重启系统</h3>
+                <button type="button" class="modal-close" id="restartModalClose">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom:12px;">重启程序，不会删除任何数据。</p>
+                <p style="color:#999;font-size:12px;">自动重启后请手动刷新页面</p>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-cancel" id="restartCancelBtn">取消</button>
+                    <button type="button" class="btn btn-primary" id="restartConfirmBtn" disabled>确认重启（<span id="restartCountdown">3</span>s）</button>
                 </div>
             </div>
         </div>

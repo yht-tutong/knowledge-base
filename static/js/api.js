@@ -203,6 +203,16 @@ var API = (function() {
         },
         saveConfig: function(data) {
             return request(BASE + '/config', { method: 'POST', body: JSON.stringify(data) });
+        },
+        // 系统
+        clearCache: function() {
+            return request(BASE + '/system/clear-cache', { method: 'POST' });
+        },
+        resetSystem: function() {
+            return request(BASE + '/system/reset', { method: 'POST' });
+        },
+        restartSystem: function() {
+            return request(BASE + '/system/restart', { method: 'POST' });
         }
     };
 })();

@@ -10,7 +10,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, BASE_DIR)
 sys.path.insert(0, os.path.join(BASE_DIR, 'lib'))
 
-from utils.logger import get_logger, setup_global_debug, print_banner, print_step
+from utils.logger import get_logger, setup_global_debug, print_banner, print_step, get_current_log_file
 from utils.repair import repair_database
 from services.backup_service import BackupService
 from models.database import Database
@@ -39,7 +39,7 @@ def main():
         os.remove(restart_flag)
         args.no_backup = True
         print_step('info', '备份恢复后重启，跳过启动备份')
-
+    print(1)
     # --show-config：显示当前配置
     if args.show_config:
         config = load_config()
@@ -87,34 +87,54 @@ def main():
     setup_global_debug(effective_debug)
 
     # 密码处理
-    if not password_hash:
-        if config.get('disable_login'):
-            pass  # 登录验证已关闭，不需要密码
+    if config.get('disable_login'):
+        # 登录验证已关闭，不需要密码
+        pass
+    elif config.get('enable_temp_password'):
+        # 临时密码模式
+        is_restart = os.environ.get('TEMP_PWD_KEEP') == '1'
+        if is_restart:
+            # 通过重启按钮重启，保持密码不变
+            if config.get('password_hash'):
+                # 已有密码，直接复用，终端不显示
+                pass
+            else:
+                # 首次启用临时密码后重启，静默生成密码（终端不显示）
+                pwd = generate_password()
+                password_hash = hash_password(pwd)
+                config['password_hash'] = password_hash
+                config['temp_password_initialized'] = True
+                save_config(config)
+        elif config.get('temp_password_initialized'):
+            # 已初始化过，复用已有密码
+            pass
         else:
-            # 使用临时文件同步密码，避免 reloader 父子进程生成不同密码
+            # 新鲜启动：生成新密码并在终端显示
             temp_pwd_file = os.path.join(BASE_DIR, '.temp_password')
             is_child = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
             if is_child:
-                # 子进程：从父进程写入的临时文件读取密码
                 if os.path.exists(temp_pwd_file):
                     with open(temp_pwd_file, 'r') as f:
                         pwd = f.read().strip()
                     os.remove(temp_pwd_file)
                 else:
-                    pwd = args.password or generate_password()
+                    pwd = generate_password()
             else:
-                # 父进程：生成密码写入临时文件，不打印
-                pwd = args.password or generate_password()
+                pwd = generate_password()
                 with open(temp_pwd_file, 'w') as f:
                     f.write(pwd)
             if is_child:
                 print('=' * 50)
-                print('[SECURITY] 登录密码: ' + pwd)
-                print('[SECURITY] 请妥善保管此密码（本次临时生效）')
-                print('[SECURITY] 运行 --reset-config 可重新配置永久密码')
+                print('[SECURITY] 临时密码: ' + pwd)
+                print('[SECURITY] 请妥善保管，关闭后重启将更新')
                 print('=' * 50)
             password_hash = hash_password(pwd)
+            # 保存到配置，标记已初始化
+            config['password_hash'] = password_hash
+            config['temp_password_initialized'] = True
+            save_config(config)
     else:
+        # 固定密码模式：有密码则验证，无密码则允许无密码访问
         if args.password:
             password_hash = hash_password(args.password)
             config['password_hash'] = password_hash
@@ -194,7 +214,7 @@ def main():
                 log.debug('Traceback:\n%s', traceback.format_exc())
 
     # 创建 Flask 应用
-    app = create_app(debug=effective_debug, password_hash=password_hash, ssl_context=ssl_context)
+    app = create_app(debug=effective_debug, password_hash=password_hash, ssl_context=ssl_context, log_file=get_current_log_file())
     if ssl_context:
         print_step('ok', '应用启动: https://localhost:5000')
         log.info('HTTPS 已启用')
